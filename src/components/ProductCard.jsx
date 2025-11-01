@@ -21,8 +21,9 @@ function ProductCard({ product, onAdd }) {
       >
         <img
           src={product.image}
-          alt={product.title}
+          alt=""
           loading="lazy"
+          decoding="async"
           style={{
             height: 160,
             objectFit: "contain",
@@ -49,10 +50,13 @@ function ProductCard({ product, onAdd }) {
           marginTop: "auto",
         }}
       >
-        <div style={{ fontWeight: 700 }}>
-          ${Number(product.price).toFixed(2)}
-        </div>
-        <Button onClick={() => onAdd?.(product)}>Add to cart</Button>
+        <div style={{ fontWeight: 800 }}>${product.price.toFixed(2)}</div>
+        <Button
+          onClick={() => onAdd(product)}
+          style={{ fontSize: 13, padding: "0.4em 0.8em" }}
+        >
+          Add to cart
+        </Button>
       </div>
     </div>
   );

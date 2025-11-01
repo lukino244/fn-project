@@ -4,8 +4,8 @@ import { Suspense, lazy } from "react";
 import Navigation, { NAVBAR_HEIGHT } from "./components/layout/Navigation.jsx";
 import Footer from "./components/layout/Footer.jsx";
 import HomePageSkeleton from "./components/HomePageSkeleton.jsx";
+import Home from "./pages/Home.jsx";
 
-const Home = lazy(() => import("./pages/Home.jsx"));
 const ProductDetails = lazy(() => import("./pages/ProductDetails.jsx"));
 const Cart = lazy(() => import("./pages/Cart.jsx"));
 const Checkout = lazy(() => import("./pages/Checkout.jsx"));

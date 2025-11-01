@@ -4,39 +4,65 @@ import Pagination from "../components/ui/Pagination.jsx";
 import Hero from "../components/Hero.jsx";
 import PromoStrip from "../components/PromoStrip.jsx";
 import { useBasket } from "../context/BasketContext.jsx";
+import HomePageSkeleton from "../components/HomePageSkeleton.jsx";
+
+const errorStyle = { color: "tomato" };
+const controlsContainerStyle = {
+  display: "flex",
+  gap: 12,
+  marginBottom: 12,
+  flexWrap: "wrap",
+};
+const searchInputStyle = {
+  padding: 10,
+  borderRadius: 8,
+  border: "1px solid #ddd",
+  flex: "1 1 260px",
+  boxSizing: "border-box",
+};
+const selectStyle = {
+  padding: 10,
+  borderRadius: 8,
+  border: "1px solid #ddd",
+  boxSizing: "border-box",
+};
+const productsGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 16,
+};
+
+const PAGE_SIZE = 8;
 
 export default function Home() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [categories, setCategories] = useState(["all"]);
-  const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
   const [sort, setSort] = useState("relevance");
+  const [page, setPage] = useState(1);
   const { addItem } = useBasket();
-  const handleAdd = useCallback((product) => addItem(product, 1), [addItem]);
 
   useEffect(() => {
     let cancelled = false;
-    async function loadData() {
+    async function load() {
       try {
         setLoading(true);
         setError("");
-
-        const [productsRes, categoriesRes] = await Promise.all([
+        const [resProducts, resCategories] = await Promise.all([
           fetch("https://fakestoreapi.com/products"),
           fetch("https://fakestoreapi.com/products/categories"),
         ]);
-
-        if (!productsRes.ok) throw new Error("Failed to fetch products");
-        if (!categoriesRes.ok) throw new Error("Failed to fetch categories");
-
-        const productsData = await productsRes.json();
-        const categoriesData = await categoriesRes.json();
-
+        if (!resProducts.ok || !resCategories.ok) {
+          throw new Error("Failed to fetch data");
+        }
+        const dataProducts = await resProducts.json();
+        const dataCategories = await resCategories.json();
         if (!cancelled) {
-          setProducts(productsData);
-          setCategories(["all", ...categoriesData]);
+          setProducts(dataProducts);
+          setCategories(["all", ...dataCategories]);
         }
       } catch (e) {
         if (!cancelled) setError(e.message || "Error loading data");
@@ -44,59 +70,82 @@ export default function Home() {
         if (!cancelled) setLoading(false);
       }
     }
-
-    loadData();
-
+    load();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const handleAdd = useCallback(
+    (product) => {
+      addItem(product);
+    },
+    [addItem]
+  );
+
+  const handleQueryChange = useCallback((e) => {
+    setPage(1);
+    setQuery(e.target.value);
+  }, []);
+
+  const handleCategoryChange = useCallback((e) => {
+    setPage(1);
+    setCategory(e.target.value);
+  }, []);
+
+  const handleSortChange = useCallback((e) => {
+    setPage(1);
+    setSort(e.target.value);
+  }, []);
 
   const filtered = useMemo(() => {
-    return products
-      .filter((p) => category === "all" || p.category === category)
-      .filter((p) => p.title.toLowerCase().includes(query.toLowerCase()))
-      .sort((a, b) => {
-        if (sort === "price-asc") return a.price - b.price;
-        if (sort === "price-desc") return b.price - a.price;
-        if (sort === "title") return a.title.localeCompare(b.title);
-        return 0;
-      });
+    let list = products;
+
+    if (category !== "all") {
+      list = list.filter((p) => p.category === category);
+    }
+
+    if (query) {
+      list = list.filter((p) =>
+        p.title.toLowerCase().includes(query.toLowerCase())
+      );
+    }
+
+    if (sort === "price-asc") {
+      list = [...list].sort((a, b) => a.price - b.price);
+    } else if (sort === "price-desc") {
+      list = [...list].sort((a, b) => b.price - a.price);
+    } else if (sort === "title") {
+      list = [...list].sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    return list;
   }, [products, category, query, sort]);
 
-  const paged = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  );
 
-  if (loading) return <div>Loading products…</div>;
-  if (error) return <div style={{ color: "tomato" }}>{error}</div>;
+  if (loading) return <HomePageSkeleton />;
+  if (error) return <div style={errorStyle}>{error}</div>;
 
   return (
     <>
       <Hero />
       <PromoStrip />
-      <div
-        style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}
-      >
+      <div style={controlsContainerStyle}>
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={handleQueryChange}
           placeholder="Search products"
-          style={{
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            flex: "1 1 260px",
-          }}
+          style={searchInputStyle}
         />
         <select
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          style={{ padding: 10, borderRadius: 8, border: "1px solid #ddd" }}
+          onChange={handleCategoryChange}
+          style={selectStyle}
+          aria-label="Filter by category"
         >
           {categories.map((c) => (
             <option key={c} value={c}>
@@ -106,8 +155,9 @@ export default function Home() {
         </select>
         <select
           value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          style={{ padding: 10, borderRadius: 8, border: "1px solid #ddd" }}
+          onChange={handleSortChange}
+          style={selectStyle}
+          aria-label="Sort by"
         >
           <option value="relevance">Sort: Relevance</option>
           <option value="price-asc">Price: Low to High</option>
@@ -115,14 +165,7 @@ export default function Home() {
           <option value="title">Title A–Z</option>
         </select>
       </div>
-      <div
-        id="products"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 16,
-        }}
-      >
+      <div id="products" style={productsGridStyle}>
         {paged.map((p) => (
           <ProductCard key={p.id} product={p} onAdd={handleAdd} />
         ))}
@@ -131,7 +174,7 @@ export default function Home() {
         page={page}
         setPage={setPage}
         totalItems={filtered.length}
-        pageSize={pageSize}
+        pageSize={PAGE_SIZE}
       />
     </>
   );
